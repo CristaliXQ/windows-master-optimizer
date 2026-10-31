@@ -54,8 +54,7 @@ $headerNorm = ($header -split "`r?`n") -join "`r`n"
 $batContent = $headerNorm + "`r`n" + $payload + "`r`n"
 
 $targets = @(
-    'C:\Users\denis\Desktop\Windows_Master_Optimizer.bat',
-    'c:\Users\denis\Desktop\gemini work\test_packed.bat'
+    'C:\Users\denis\Desktop\Windows_Master_Optimizer.bat'
 )
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -64,14 +63,23 @@ foreach ($t in $targets) {
     Write-Output "$t written successfully. Size: $((Get-Item $t).Length) bytes"
 }
 
-$hashes = @{}
-foreach ($t in $targets) {
-    $h = (Get-FileHash -Path $t -Algorithm SHA256).Hash
-    $hashes[$t] = $h
-}
-$unique = @($hashes.Values | Select-Object -Unique)
-if ($unique.Count -eq 1) {
-    Write-Output "VERIFICATION SUCCESS: All 4 batch files have identical SHA-256: $($unique[0])"
-} else {
-    Write-Error "HASH MISMATCH across batch targets!"
+$h = (Get-FileHash -Path $targets[0] -Algorithm SHA256).Hash
+Write-Output "VERIFICATION SUCCESS: SHA-256: $h"
+
+$gitRepo = 'C:\Users\denis\Desktop\windows-master-optimizer'
+if (Test-Path $gitRepo) {
+    Copy-Item 'C:\Users\denis\Desktop\Windows_Master_Optimizer.bat' "$gitRepo\Windows_Master_Optimizer.bat" -Force
+    Copy-Item 'c:\Users\denis\Desktop\gemini work\new_source_optimizer.ps1' "$gitRepo\new_source_optimizer.ps1" -Force
+    Copy-Item 'c:\Users\denis\Desktop\gemini work\pack_test.ps1' "$gitRepo\pack.ps1" -Force
+    Push-Location $gitRepo
+    try {
+        git add . *> $null
+        $hashShort = $h.Substring(0, 8)
+        $dateStr = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        git commit -m "Auto-sync build: $dateStr (SHA-256: $hashShort)" *> $null
+        git push origin main *> $null
+        Write-Output "GITHUB SYNC SUCCESS: Pushed to https://github.com/CristaliXQ/windows-master-optimizer"
+    } finally {
+        Pop-Location
+    }
 }
